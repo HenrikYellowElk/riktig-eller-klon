@@ -1,0 +1,59 @@
+{
+ "clone": "fable21",
+ "window": [
+  4.5,
+  16.5
+ ],
+ "gapSeconds": 0.5,
+ "clips": [
+  {
+   "id": "bridge",
+   "title": "Gitarr, stallmikrofon",
+   "real": "bridge__real.wav",
+   "clone": "bridge__clone.wav"
+  },
+  {
+   "id": "C01",
+   "title": "Gitarrstimulus C01",
+   "real": "C01__real.wav",
+   "clone": "C01__clone.wav"
+  },
+  {
+   "id": "C02",
+   "title": "Gitarrstimulus C02",
+   "real": "C02__real.wav",
+   "clone": "C02__clone.wav"
+  },
+  {
+   "id": "C03",
+   "title": "Gitarrstimulus C03",
+   "real": "C03__real.wav",
+   "clone": "C03__clone.wav"
+  },
+  {
+   "id": "C04",
+   "title": "Gitarrstimulus C04",
+   "real": "C04__real.wav",
+   "clone": "C04__clone.wav"
+  },
+  {
+   "id": "C05",
+   "title": "Gitarrstimulus C05",
+   "real": "C05__real.wav",
+   "clone": "C05__clone.wav"
+  },
+  {
+   "id": "C06",
+   "title": "Gitarrstimulus C06",
+   "real": "C06__real.wav",
+   "clone": "C06__clone.wav"
+  },
+  {
+   "id": "neck",
+   "title": "Gitarr, halsmikrofon",
+   "real": "neck__real.wav",
+   "clone": "neck__clone.wav"
+  }
+ ],
+ "resultsUrl": ""
+}

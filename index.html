@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riktig eller klon</title>
+<meta name="description" content="Blindtest: hör du skillnad på en riktig reverb och klonen?">
+<style>
+:root {
+  --bg: #f4f1ea; --card: #ffffff; --fg: #1d1b18; --muted: #6b665e; --line: #d9d3c7;
+  --accent: #2f6fb6; --accent-fg: #ffffff; --ok: #2e8b57; --bad: #c0392b; --mark: #fff3c4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171b; --card: #1f2228; --fg: #e9e6df; --muted: #a39d92; --line: #343941;
+    --accent: #7fb0f0; --accent-fg: #10131a; --ok: #3fbf7a; --bad: #e0574a; --mark: #4a4120;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171b; --card: #1f2228; --fg: #e9e6df; --muted: #a39d92; --line: #343941;
+  --accent: #7fb0f0; --accent-fg: #10131a; --ok: #3fbf7a; --bad: #e0574a; --mark: #4a4120;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
+h1 { font-size: 1.5rem; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.row .n { width: 1.6em; color: var(--muted); text-align: right; }
+.row .q { flex: 1; color: var(--muted); min-width: 8em; }
+button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button.playing { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.toggle button { border: 0; border-radius: 0; }
+.toggle button + button { border-left: 1px solid var(--line); }
+.toggle button.sel { background: var(--accent); color: var(--accent-fg); }
+.toggle button.ok { background: var(--ok); color: #fff; }
+.toggle button.bad { background: var(--bad); color: #fff; }
+.top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.top .spacer { flex: 1; }
+input[type=text] { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg); min-width: 12em; }
+.foot { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.score { font-weight: 600; }
+.muted { color: var(--muted); }
+#board { display: none; }
+#board.open { display: block; }
+table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+tr.me { background: var(--mark); }
+.note { font-size: .9rem; color: var(--muted); }
+.vol { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>Riktig eller klon?</h1>
+<p class="sub">Varje rad spelar två gitarrklipp efter varandra. Ett är den riktiga reverben, det andra vår klon. Gissa vilket som är riktigt.</p>
+
+<div class="card top">
+  <label>Namn <input type="text" id="name" placeholder="ditt namn" autocomplete="off"></label>
+  <button id="startBtn" class="primary">Starta omgång</button>
+  <span class="spacer"></span>
+  <span class="vol">Volym <input type="range" id="vol" min="0" max="100" value="80"></span>
+  <button id="stopBtn">Stoppa</button>
+  <button id="boardBtn">Topplista</button>
+</div>
+
+<div class="card top" id="refCard">
+  <span class="muted">Lär dig skillnaden: <span id="refTitle"></span></span>
+  <span class="spacer"></span>
+  <button id="refReal">▶ Riktig</button>
+  <button id="refClone">▶ Klon</button>
+</div>
+
+<div id="rows"></div>
+
+<div class="foot">
+  <button id="gradeBtn" class="primary">Rätta</button>
+  <span id="scoreTxt" class="score"></span>
+  <span id="saveTxt" class="muted"></span>
+  <button id="newBtn" style="display:none">Ny omgång</button>
+</div>
+
+<div class="card" id="board">
+  <h2 style="margin:4px 0 8px;font-size:1.1rem">Topplista</h2>
+  <div id="boardBest"></div>
+  <h3 style="margin:14px 0 6px;font-size:1rem">Senaste omgångar</h3>
+  <div id="boardLast"></div>
+  <p class="note" id="boardNote"></p>
+</div>
+</main>
+
+<script>
+(async function () {
+  const cfg = await fetch('clips.json', {cache: 'no-store'}).then(r => r.json());
+  const CLIPS = cfg.clips, GAP = cfg.gapSeconds || 0.5, N = 10;
+  const $ = id => document.getElementById(id);
+  const AC = new (window.AudioContext || window.webkitAudioContext)();
+  const gain = AC.createGain(); gain.connect(AC.destination);
+  gain.gain.value = 0.8;
+  $('vol').oninput = e => { gain.gain.value = e.target.value / 100; };
+  const buffers = new Map();
+  async function buf(file) {
+    if (!buffers.has(file)) {
+      const ab = await fetch('audio/' + file).then(r => r.arrayBuffer());
+      buffers.set(file, await AC.decodeAudioData(ab));
+    }
+    return buffers.get(file);
+  }
+  let playing = [];
+  function stopAll() { playing.forEach(s => { try { s.stop(); } catch (e) {} }); playing = []; document.querySelectorAll('.playing').forEach(b => b.classList.remove('playing')); }
+  $('stopBtn').onclick = stopAll;
+  async function playSeq(files, btn) {
+    stopAll(); if (AC.state === 'suspended') await AC.resume();
+    btn.classList.add('playing');
+    let t = AC.currentTime + 0.05;
+    for (const f of files) {
+      const b = await buf(f); const s = AC.createBufferSource(); s.buffer = b; s.connect(gain); s.start(t); playing.push(s);
+      t += b.duration + GAP;
+    }
+    const last = playing[playing.length - 1]; if (last) last.onended = () => btn.classList.remove('playing');
+  }
+  function rnd(n) { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; }
+  function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = rnd(i + 1); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+
+  let round = null, name = '';
+  function pickRows() {
+    const pool = shuffle(CLIPS.slice()); const rows = [];
+    while (rows.length < N) { for (const c of shuffle(pool.slice())) { if (rows.length < N && (rows.length === 0 || rows[rows.length - 1].clip.id !== c.id)) rows.push({clip: c, realFirst: rnd(2) === 0, answer: null}); } }
+    return rows.slice(0, N);
+  }
+  function render() {
+    const box = $('rows'); box.innerHTML = '';
+    round.rows.forEach((r, i) => {
+      const d = document.createElement('div'); d.className = 'card row';
+      d.innerHTML = `<span class="n">${i + 1}.</span><button class="play">▶ Spela</button><span class="q">Vilken är riktig?</span>
+        <span class="toggle"><button data-a="1">den första</button><button data-a="2">den andra</button></span>`;
+      const files = r.realFirst ? [r.clip.real, r.clip.clone] : [r.clip.clone, r.clip.real];
+      d.querySelector('.play').onclick = e => playSeq(files, e.target);
+      d.querySelectorAll('.toggle button').forEach(b => b.onclick = () => { if (round.graded) return; r.answer = +b.dataset.a; d.querySelectorAll('.toggle button').forEach(x => x.classList.toggle('sel', x === b)); });
+      box.appendChild(d);
+    });
+    const ref = CLIPS[rnd(CLIPS.length)]; $('refTitle').textContent = ref.title;
+    $('refReal').onclick = e => playSeq([ref.real], e.target); $('refClone').onclick = e => playSeq([ref.clone], e.target);
+    $('scoreTxt').textContent = ''; $('saveTxt').textContent = ''; $('newBtn').style.display = 'none'; $('gradeBtn').disabled = false;
+  }
+  function setEnabled(on) { ['refReal', 'refClone', 'gradeBtn'].forEach(id => $(id).disabled = !on); document.querySelectorAll('#rows button').forEach(b => b.disabled = !on); }
+
+  $('startBtn').onclick = () => {
+    name = $('name').value.trim();
+    if (!name) { $('name').focus(); $('name').placeholder = 'skriv ditt namn först'; return; }
+    $('name').disabled = true; $('startBtn').disabled = true;
+    round = {rows: pickRows(), graded: false, started: new Date().toISOString()};
+    render(); setEnabled(true);
+  };
+  setEnabled(false);
+
+  $('gradeBtn').onclick = async () => {
+    if (!round || round.graded) return;
+    round.graded = true; stopAll();
+    let right = 0, answered = 0;
+    document.querySelectorAll('#rows .row').forEach((d, i) => {
+      const r = round.rows[i]; const correct = r.realFirst ? 1 : 2;
+      d.querySelectorAll('.toggle button').forEach(b => { b.classList.remove('sel'); if (+b.dataset.a === r.answer) { b.classList.add(r.answer === correct ? 'ok' : 'bad'); } b.disabled = true; });
+      if (r.answer) { answered++; if (r.answer === correct) right++; }
+    });
+    $('gradeBtn').disabled = true;
+    $('scoreTxt').textContent = `${right} av ${N} rätt`;
+    const rec = {name, score: right, answered, total: N, time: new Date().toISOString(), clone: cfg.clone,
+      rows: round.rows.map(r => ({clip: r.clip.id, realFirst: r.realFirst, answer: r.answer}))};
+    await save(rec);
+    $('newBtn').style.display = '';
+    await showBoard(rec);
+  };
+  $('newBtn').onclick = () => { $('board').classList.remove('open'); round = {rows: pickRows(), graded: false, started: new Date().toISOString()}; render(); setEnabled(true); };
+
+  // Resultat: till Google Apps Script-formuläret om resultsUrl är satt, annars bara lokalt i webbläsaren.
+  function localAll() { try { return JSON.parse(localStorage.getItem('rk_results') || '[]'); } catch (e) { return []; } }
+  async function save(rec) {
+    const hidden = rec.name.toLowerCase() === 'demo';   // dold: namnet "demo" hamnar inte i topplistan
+    rec.hidden = hidden;
+    try { const all = localAll(); all.push(rec); localStorage.setItem('rk_results', JSON.stringify(all.slice(-200))); } catch (e) {}
+    if (cfg.resultsUrl) {
+      try { await fetch(cfg.resultsUrl, {method: 'POST', body: JSON.stringify(rec), headers: {'Content-Type': 'text/plain;charset=utf-8'}}); $('saveTxt').textContent = 'Sparat.'; }
+      catch (e) { $('saveTxt').textContent = 'Kunde inte spara till servern (sparat lokalt).'; }
+    } else { $('saveTxt').textContent = 'Sparat lokalt i din webbläsare.'; }
+  }
+  async function fetchRemote() {
+    if (!cfg.resultsUrl) return null;
+    try { return await fetch(cfg.resultsUrl + (cfg.resultsUrl.includes('?') ? '&' : '?') + 'list=1', {cache: 'no-store'}).then(r => r.json()); } catch (e) { return null; }
+  }
+  async function showBoard(mine) {
+    const remote = await fetchRemote();
+    const all = (remote && remote.results) ? remote.results : localAll();
+    const vis = all.filter(r => !r.hidden);
+    const best = {}; vis.forEach(r => { const b = best[r.name] || {name: r.name, best: -1, n: 0, sum: 0}; b.n++; b.sum += r.score; if (r.score > b.best) b.best = r.score; best[r.name] = b; });
+    const bestRows = Object.values(best).sort((a, b) => b.best - a.best || b.sum / b.n - a.sum / a.n);
+    $('boardBest').innerHTML = '<table><tr><th>Namn</th><th>Bäst</th><th>Omgångar</th><th>Snitt</th></tr>' +
+      bestRows.map(b => `<tr class="${mine && b.name === mine.name && !mine.hidden ? 'me' : ''}"><td>${esc(b.name)}</td><td>${b.best}/${N}</td><td>${b.n}</td><td>${(b.sum / b.n).toFixed(1)}</td></tr>`).join('') + '</table>';
+    const last = vis.slice(-15).reverse();
+    $('boardLast').innerHTML = '<table><tr><th>Tid</th><th>Namn</th><th>Poäng</th></tr>' +
+      last.map(r => `<tr class="${mine && r.time === mine.time ? 'me' : ''}"><td>${r.time.replace('T', ' ').slice(0, 16)}</td><td>${esc(r.name)}</td><td>${r.score}/${r.total}</td></tr>`).join('') + '</table>';
+    $('boardNote').textContent = remote ? 'Gemensam topplista.' : 'Lokal topplista (bara den här webbläsaren).';
+    $('board').classList.add('open'); $('board').scrollIntoView({behavior: 'smooth'});
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])); }
+  $('boardBtn').onclick = () => { if ($('board').classList.contains('open')) $('board').classList.remove('open'); else showBoard(null); };
+})();
+</script>
+</body>
+</html>
